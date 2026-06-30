@@ -56,28 +56,17 @@
     </div>
   </main>
 
-  <footer>把此文件与图片放在同一目录：1.jpg … 6.jpg，或把图片路径修改为你自己的 URL。</footer>
+  <footer>把此文件与图片放在同一目录，或修改 imageMap 为你自己的 URL。</footer>
 
 <script>
-/*
-  使用方式
-  - 把你上传的 6 张图片下载并按下面文件名重命名（或将 imageMap 的值改为图片 URL 或 data URL）：
-    1.jpg = 关卡1 原图（left）
-    2.jpg = 关卡1 差异图（right）
-    3.jpg = 关卡2 原图（left）
-    4.jpg = 关卡2 差异图（right）
-    5.jpg = 关卡3 原图（left）
-    6.jpg = 关卡3 差异图（right）
-*/
-
-// 用本地文件名作为图片来源（默认）
+// 使用已上传到仓库的实际文件名，以避免重命名步骤
 const imageMap = {
-  IMAGE_1: '1.jpg',
-  IMAGE_2: '2.jpg',
-  IMAGE_3: '3.jpg',
-  IMAGE_4: '4.jpg',
-  IMAGE_5: '5.jpg',
-  IMAGE_6: '6.jpg'
+  IMAGE_1: '1.jpg — 关卡1 原图（left）.jpg',
+  IMAGE_2: '2.jpg — 关卡1 差异图（right）.jpg',
+  IMAGE_3: '3.jpg — 关卡2 原图（left）.jpg',
+  IMAGE_4: '4.jpg — 关卡2 差异图（right）.jpg',
+  IMAGE_5: '5.jpg — 关卡3 原图（left）.jpg',
+  IMAGE_6: '6.jpg — 关卡3 差异图（right）.jpg'
 };
 
 const levels = [
