@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>找不同 - 三关（首页）</title>
+<style>
+  :root{--bg:#f4f7fb;--card:#fff;--accent:#2b8cff;--ok:#2ecc71;--miss:#ff6b6b}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:#222;display:flex;flex-direction:column;min-height:100vh}
+  .container{max-width:980px;margin:18px auto;padding:12px}
+  .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(20,40,80,0.06)}
+  .stage{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+  .imageWrap{position:relative;flex:1;min-width:260px;max-width:560px}
+  img.playImg{width:100%;height:auto;border-radius:8px;border:1px solid #ddd;display:block;background:#fff}
+  canvas.hitLayer{position:absolute;left:0;top:0;pointer-events:none}
+  .controls{display:flex;gap:8px;align-items:center;margin-top:12px}
+  button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .small{font-size:13px;padding:6px 8px;border-radius:6px}
+  .status{display:flex;gap:10px;align-items:center}
+  .dot{width:18px;height:18px;border-radius:50%}
+  footer{margin-top:auto;padding:12px;text-align:center;font-size:13px;color:#666}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+  <header style="padding:12px 16px;border-bottom:1px solid #e6eefb;background:#fff">
+    <div class="container" style="display:flex;align-items:center">
+      <h2 style="margin:0">找不同（3 关）</h2>
+      <div style="margin-left:auto">得分：<span id="score">0</span> 用时：<span id="timer">0s</span></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <div id="levelTitle">关卡 1</div>
+      <div class="stage" style="margin-top:12px">
+        <div style="flex:1">
+          <div><strong>原图</strong></div>
+          <div class="imageWrap"><img id="leftImage" class="playImg" alt="left" /></div>
+        </div>
+
+        <div style="flex:1">
+          <div><strong>找不同（点击此图）</strong></div>
+          <div class="imageWrap" id="rightWrap" style="touch-action:manipulation">
+            <img id="rightImage" class="playImg" alt="right" />
+            <canvas id="hitCanvas" class="hitLayer"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div id="progressDots"></div>
+        <div style="margin-left:auto"><span id="msg">准备中</span></div>
+        <button id="nextBtn" class="hidden small">下一张</button>
+      </div>
+    </div>
+  </main>
+
+  <footer>把此文件与图片放在同一目录，或修改 imageMap 为你自己的 URL。</footer>
+
+<script>
+// 使用仓库中已存在的实际文件名（包含中文和空格）以保证页面能直接加载图片
+const imageMap = {
+  IMAGE_1: '1.jpg — 关卡1 原图（left）.jpg',
+  IMAGE_2: '2.jpg — 关卡1 差异图（right）.jpg',
+  IMAGE_3: '3.jpg — 关卡2 原图（left）.jpg',
+  IMAGE_4: '4.jpg — 关卡2 差异图（right）.jpg',
+  IMAGE_5: '5.jpg — 关卡3 原图（left）.jpg',
+  IMAGE_6: '6.jpg — 关卡3 差异图（right）.jpg'
+};
+
+const levels = [
+  {
+    name: '关卡 1',
+    scenes: [
+      {
+        title: '关卡1',
+        leftSrc: imageMap.IMAGE_1,
+        rightSrc: imageMap.IMAGE_2,
+        differences: [
+          {"x": 0.270, "y": 0.233, "r": 0.05},
+          {"x": 0.397, "y": 0.637, "r": 0.05},
+          {"x": 0.782, "y": 0.794, "r": 0.05}
+        ]
+      }
+    ]
+  },
+  {
+    name: '关卡 2',
+    scenes: [
+      {
+        title: '关卡2',
+        leftSrc: imageMap.IMAGE_3,
+        rightSrc: imageMap.IMAGE_4,
+        differences: [
+          {"x": 0.676, "y": 0.341, "r": 0.05},
+          {"x": 0.652, "y": 0.453, "r": 0.05},
+          {"x": 0.199, "y": 0.451, "r": 0.05}
+        ]
+      }
+    ]
+  },
+  {
+    name: '关卡 3',
+    scenes: [
+      {
+        title: '关卡3',
+        leftSrc: imageMap.IMAGE_5,
+        rightSrc: imageMap.IMAGE_6,
+        differences: [
+          {"x": 0.529, "y": 0.581, "r": 0.05},
+          {"x": 0.216, "y": 0.377, "r": 0.05},
+          {"x": 0.735, "y": 0.319, "r": 0.05}
+        ]
+      }
+    ]
+  }
+];
+
+// 游戏逻辑（无需修改）
+let levelIndex = 0, sceneIndex = 0, found = [], score = 0, timer=0, timerId=null;
+const leftImage = document.getElementById('leftImage');
+const rightImage = document.getElementById('rightImage');
+const hitCanvas = document.getElementById('hitCanvas');
+const rightWrap = document.getElementById('rightWrap');
+const levelTitle = document.getElementById('levelTitle');
+const progressDots = document.getElementById('progressDots');
+const msg = document.getElementById('msg');
+const nextBtn = document.getElementById('nextBtn');
+const scoreEl = document.getElementById('score');
+const timerEl = document.getElementById('timer');
+
+function startTimer(){ if(timerId) clearInterval(timerId); timer = 0; timerEl.textContent = timer + 's'; timerId = setInterval(()=>{ timer++; timerEl.textContent = timer + 's'; },1000); }
+function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
+
+function resizeCanvas(){
+  const rect = rightImage.getBoundingClientRect();
+  hitCanvas.width = Math.round(rect.width);
+  hitCanvas.height = Math.round(rect.height);
+  hitCanvas.style.width = rect.width + 'px';
+  hitCanvas.style.height = rect.height + 'px';
+  hitCanvas.style.left = rightImage.offsetLeft + 'px';
+  hitCanvas.style.top = rightImage.offsetTop + 'px';
+  redrawMarks();
+}
+
+window.addEventListener('resize', resizeCanvas);
+rightImage.addEventListener('load', resizeCanvas);
+
+function loadScene(){
+  if(!levels.length){ msg.textContent = '没有关卡数据。'; return; }
+  const level = levels[levelIndex];
+  const scene = level.scenes[sceneIndex];
+  levelTitle.textContent = `${level.name} — ${scene.title}`;
+  leftImage.src = scene.leftSrc;
+  rightImage.src = scene.rightSrc;
+  found = new Array(scene.differences.length).fill(false);
+  renderDots();
+  drawAll();
+  msg.textContent = `找到 0 / ${scene.differences.length} 处`;
+  nextBtn.classList.add('hidden');
+  if(!timerId) startTimer();
+}
+
+function renderDots(){
+  progressDots.innerHTML = '';
+  const scene = levels[levelIndex].scenes[sceneIndex];
+  for(let i=0;i<scene.differences.length;i++){
+    const el = document.createElement('div');
+    el.className = 'dot';
+    el.style.background = found[i] ? 'var(--ok)' : '#ddd';
+    el.style.width = '18px'; el.style.height='18px'; el.style.borderRadius='50%'; el.style.marginRight='6px';
+    progressDots.appendChild(el);
+  }
+}
+
+function drawAll(){
+  const ctx = hitCanvas.getContext('2d');
+  ctx.clearRect(0,0,hitCanvas.width, hitCanvas.height);
+  const scene = levels[levelIndex].scenes[sceneIndex];
+  scene.differences.forEach((d,i)=>{
+    if(found[i]){
+      const cx = d.x * hitCanvas.width;
+      const cy = d.y * hitCanvas.height;
+      const rr = d.r * hitCanvas.width * 1.4;
+      ctx.beginPath();
+      ctx.strokeStyle = '#2ecc71';
+      ctx.lineWidth = 4;
+      ctx.arc(cx,cy,rr,0,Math.PI*2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(46,204,113,0.12)';
+      ctx.fill();
+    }
+  });
+}
+function redrawMarks(){ drawAll(); }
+
+rightWrap.addEventListener('click', (ev)=>{
+  if(!levels.length) return;
+  const rect = rightImage.getBoundingClientRect();
+  const offsetX = ev.clientX - rect.left;
+  const offsetY = ev.clientY - rect.top;
+  const px = offsetX / rect.width;
+  const py = offsetY / rect.height;
+  const scene = levels[levelIndex].scenes[sceneIndex];
+  let hit = -1;
+  scene.differences.forEach((d,i)=>{
+    if(found[i]) return;
+    const dx = px - d.x;
+    const dy = py - d.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if(dist <= d.r * 1.8) hit = i;
+  });
+  if(hit >= 0){
+    found[hit] = true;
+    score += 10;
+    scoreEl.textContent = score;
+    renderDots();
+    drawAll();
+    msg.textContent = `找到 ${found.filter(Boolean).length} / ${scene.differences.length} 处`;
+    if(found.every(Boolean)){
+      msg.textContent = '本张完成！';
+      nextBtn.classList.remove('hidden');
+    }
+  } else {
+    const ctx = hitCanvas.getContext('2d');
+    const cx = px * hitCanvas.width;
+    const cy = py * hitCanvas.height;
+    ctx.beginPath(); ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 4; ctx.arc(cx,cy,14,0,Math.PI*2); ctx.stroke();
+    setTimeout(()=>{ drawAll(); },600);
+  }
+});
+
+nextBtn.addEventListener('click', ()=>{
+  sceneIndex++;
+  const level = levels[levelIndex];
+  if(sceneIndex >= level.scenes.length){
+    levelIndex++;
+    if(levelIndex >= levels.length){
+      stopTimer();
+      alert(`恭喜完成全部关卡！得分：${score}，用时：${timer}s`);
+      return;
+    } else {
+      sceneIndex = 0;
+      alert(`进入 ${levels[levelIndex].name}`);
+    }
+  }
+  loadScene();
+});
+
+// 初始化
+function init(){
+  if(levels.length && levels[0].scenes.length) loadScene();
+  else msg.textContent = '当前没有关卡数据。';
+}
+init();
+
+</script>
+</body>
+</html>
